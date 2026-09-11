@@ -1,0 +1,52 @@
+# Prometheus config skeleton for P04.
+# TODO(verify): syntax and defaults against prom/prometheus:v3.14.0.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    env: local
+    project: p04
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - 127.0.0.1:9090
+
+  - job_name: grafana
+    static_configs:
+      - targets:
+          - grafana:3000
+
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - alertmanager:9093
+
+  - job_name: postgres-exporter
+    static_configs:
+      - targets:
+          - postgres-exporter:9187
+
+  - job_name: redis-exporter
+    static_configs:
+      - targets:
+          - redis-exporter:9121
+
+  # TODO(verify): n8n 2.37.9 /metrics path, queue metrics, and worker scrape
+  # addresses (P04-T02). Do not invent metric names here.
+  # - job_name: n8n-main
+  #     static_configs:
+  #       - targets:
+  #           - n8n-main:5678
+  #     metrics_path: /metrics

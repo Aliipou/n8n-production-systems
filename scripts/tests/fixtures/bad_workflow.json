@@ -1,0 +1,60 @@
+{
+  "id": "plt-test-bad",
+  "name": "[PLT] Test Bad Workflow",
+  "nodes": [
+    {
+      "id": "http-default",
+      "name": "HTTP Request1",
+      "parameters": {
+        "method": "GET",
+        "url": "http://flaky-api:8091/items"
+      },
+      "position": [0, 0],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "code-default",
+      "name": "Code",
+      "parameters": {
+        "jsCode": "// snippet: missing_fixture_snippet\nreturn items;\n"
+      },
+      "position": [240, 0],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "set-default",
+      "name": "Set2",
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        }
+      },
+      "position": [480, 0],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "if-default",
+      "name": "IF",
+      "parameters": {},
+      "position": [720, 0],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    }
+  ],
+  "connections": {},
+  "pinData": {
+    "HTTP Request1": [
+      {
+        "json": {
+          "ok": true
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

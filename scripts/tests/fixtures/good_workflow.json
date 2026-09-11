@@ -1,0 +1,76 @@
+{
+  "active": false,
+  "connections": {
+    "Call backend health": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Pass items through",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Manual start": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call backend health",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "id": "plt-test-good",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "name": "[PLT] Test Good Workflow",
+  "nodes": [
+    {
+      "id": "manual-start",
+      "name": "Manual start",
+      "parameters": {},
+      "position": [0, 0],
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ci-header-auth",
+          "name": "CI Header Auth"
+        }
+      },
+      "id": "call-backend-health",
+      "name": "Call backend health",
+      "parameters": {
+        "method": "GET",
+        "options": {
+          "timeout": 10000
+        },
+        "url": "={{ $('Lookup settings').item.json.base_url }}"
+      },
+      "position": [240, 0],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "pass-items-through",
+      "name": "Pass items through",
+      "parameters": {
+        "jsCode": "return items;\n"
+      },
+      "position": [480, 0],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    }
+  ],
+  "settings": {
+    "errorWorkflow": "plt-error-handler",
+    "executionOrder": "v1"
+  }
+}

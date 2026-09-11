@@ -1,0 +1,6 @@
+# Invented disposable-mail domains for local tests and demos.
+# Source: written for this repository. Not copied from a public blocklist.
+# Replace with a maintained list before any real deployment.
+throwaway-inbox.test
+temp-drop.test
+once-mail.test

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Review {{ item.id if item else "item" }}{% endblock %}
+{% block content %}
+<h1>Review item</h1>
+
+{% if notice == "approved" %}
+<p class="notice">Decision saved: approved.</p>
+{% elif notice == "rejected" %}
+<p class="notice">Decision saved: rejected.</p>
+{% elif notice == "already_decided" %}
+<p class="notice">Already decided. No change.</p>
+{% elif notice == "db_error" %}
+<p class="error">Database write failed. The item was not changed.</p>
+{% elif notice == "approved_receiver_failed" %}
+<p class="notice">Decision saved: approved. Receiver webhook failed.</p>
+{% elif notice == "rejected_receiver_failed" %}
+<p class="notice">Decision saved: rejected. Receiver webhook failed.</p>
+{% endif %}
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+{% if item %}
+<table>
+  <tbody>
+    <tr><th>Id</th><td>{{ item.id }}</td></tr>
+    <tr><th>Project</th><td>{{ item.project }}</td></tr>
+    <tr><th>Kind</th><td>{{ item.kind }}</td></tr>
+    <tr><th>Subject</th><td>{{ item.subject_id }}</td></tr>
+    <tr><th>Status</th><td>{{ item.status }}</td></tr>
+    <tr><th>Created</th><td>{{ item.created_at }}</td></tr>
+    <tr><th>Decided at</th><td>{{ item.decided_at }}</td></tr>
+    <tr><th>Decided by</th><td>{{ item.decided_by }}</td></tr>
+    <tr><th>Callback workflow</th><td>{{ item.callback_workflow_id }}</td></tr>
+  </tbody>
+</table>
+
+<h2>Payload</h2>
+<pre>{{ payload_json }}</pre>
+
+{% if item.decision %}
+<h2>Decision</h2>
+<pre>{{ item.decision }}</pre>
+{% endif %}
+
+{% if pending %}
+<div class="actions">
+  <form method="post" action="/reviews/{{ item.id }}/approve">
+    <label for="approve-reason">Note (optional)</label>
+    <textarea id="approve-reason" name="reason"></textarea>
+    <button type="submit">Approve</button>
+  </form>
+  <form method="post" action="/reviews/{{ item.id }}/reject">
+    <label for="reject-reason">Reason (optional)</label>
+    <textarea id="reject-reason" name="reason"></textarea>
+    <button type="submit">Reject</button>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,55 @@
+# Overlay for `make up P=p01-lead-qualification`.
+# Merges with platform/compose/docker-compose.base.yml.
+# Not runnable on its own (needs the platform postgres service).
+#
+# Host ports bind to 127.0.0.1 only. The process inside the container listens
+# on 0.0.0.0 so n8n on the compose network can reach it.
+
+services:
+  p01-migrate:
+    image: amacneil/dbmate:2.35.1
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /migrations
+      DBMATE_NO_DUMP_SCHEMA: "true"
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command: ["--wait", "--no-dump-schema", "--migrations-dir", "/migrations", "up"]
+
+  p01-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: p01-backend:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8101:8000"
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}
+      P01_SCORING_CONFIG: /app/config/scoring.yaml
+      MX_CHECK: "false"
+      TZ: ${TZ:-Europe/Helsinki}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      p01-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s

@@ -1,0 +1,22 @@
+# Finnish VAT rates for the vat_rates validator.
+#
+# TODO(verify): look up the official rates and the dates they took effect on
+# vero.fi (Arvonlisaverokannat / VAT rates). Copy those numbers into `rates`
+# below. Do not fill rates from memory, training data, blogs, or this comment.
+# A wrong rate would let invoices pass vat_rates with illegal VAT.
+#
+# Until `rates` contains verified numeric values from vero.fi, the vat_rates
+# rule fails closed: no invoice rate is accepted.
+#
+# After verification, use this shape (values from vero.fi only):
+#   rates:
+#     - rate: <number from vero.fi>
+#       valid_from: YYYY-MM-DD
+#       label: <label from vero.fi>
+#
+# rate_unit must match how rates are written on the invoice and in vero.fi.
+# percent means 24 is 24 %. fraction means 0.24 is 24 %. Pick one after lookup.
+
+version: 1
+rate_unit: percent
+rates: []

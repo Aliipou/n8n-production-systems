@@ -1,0 +1,32 @@
+# p03-ingress. Not runnable on its own. `make up P=p03` merges this file with
+# platform/compose/docker-compose.base.yml once PLT-T03 exists.
+#
+# Host ports bind to 127.0.0.1 only. The process inside the container listens
+# on 0.0.0.0 so n8n on the compose network can reach it later.
+
+services:
+  p03-ingress:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: p03-ingress:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8103:8103"
+    environment:
+      P03_INGRESS_ADDR: ":8103"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-change-me}
+      SHOPIFY_WEBHOOK_SECRET: ${SHOPIFY_WEBHOOK_SECRET:-change-me}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-change-me}
+      CUSTOM_WEBHOOK_SECRET: ${CUSTOM_WEBHOOK_SECRET:-change-me}
+      TZ: ${TZ:-Europe/Helsinki}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "p03-ingress", "-healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s

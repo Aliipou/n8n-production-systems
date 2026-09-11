@@ -1,0 +1,168 @@
+# Monitoring overlay for P04. Not runnable on its own.
+# From the repository root:
+#   make up P=p04-reliability
+# which merges this file with platform/compose/docker-compose.base.yml.
+#
+# Host ports bind to 127.0.0.1 only.
+#
+# Image tags are pinned. Do not use latest, next, stable, or beta.
+# Lookup date: 2026-09-11 (GitHub release pages).
+# TODO(verify): Docker Hub / Quay tag strings match these GitHub releases,
+# and that each image contains the healthcheck binary used below.
+#   prom/prometheus:v3.14.0              GitHub prometheus/prometheus v3.14.0 (2026-08-17)
+#   grafana/grafana:13.2.1               GitHub grafana/grafana v13.2.1 (2026-09-02)
+#   prom/alertmanager:v0.34.0            GitHub prometheus/alertmanager v0.34.0 (2026-08-16)
+#   prometheuscommunity/postgres-exporter:v0.20.1
+#                                        GitHub prometheus-community/postgres_exporter v0.20.1 (2026-07-07)
+#   oliver006/redis_exporter:v1.91.1     GitHub oliver006/redis_exporter v1.91.1 (2026-09-07)
+#
+# Bind-mount paths are relative to the repository root because Makefile
+# runs `docker compose --project-directory .`.
+# TODO(verify): if a future compose change resolves paths from this file
+# instead, switch these mounts to ./prometheus, ./grafana, ./alertmanager.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: n8n-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./projects/p04-reliability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./projects/p04-reliability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      alertmanager:
+        condition: service_healthy
+    healthcheck:
+      # TODO(verify): /-/healthy on prom/prometheus:v3.14.0
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9090/-/healthy >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    container_name: n8n-grafana
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Helsinki}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_CHECK_FOR_UPDATES: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_PATHS_DASHBOARDS: /var/lib/grafana/dashboards
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./projects/p04-reliability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./projects/p04-reliability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      # TODO(verify): wget exists on grafana/grafana:13.2.1; /api/health path
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    container_name: n8n-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./projects/p04-reliability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    healthcheck:
+      # TODO(verify): /-/healthy on prom/alertmanager:v0.34.0
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9093/-/healthy >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1
+    container_name: n8n-postgres-exporter
+    restart: unless-stopped
+    environment:
+      # Scrapes database app (ops + project schemas), not n8n's own DB.
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}?sslmode=disable
+      TZ: ${TZ:-Europe/Helsinki}
+    ports:
+      - "127.0.0.1:9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # TODO(verify): wget and listen port 9187 on prometheuscommunity/postgres-exporter:v0.20.1
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9187/metrics >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.91.1
+    container_name: n8n-redis-exporter
+    restart: unless-stopped
+    environment:
+      # TODO(verify): REDIS_ADDR and REDIS_PASSWORD names for oliver006/redis_exporter:v1.91.1
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me}
+      TZ: ${TZ:-Europe/Helsinki}
+    ports:
+      - "127.0.0.1:9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # TODO(verify): wget and listen port 9121 on oliver006/redis_exporter:v1.91.1
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9121/metrics >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:

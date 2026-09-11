@@ -1,0 +1,9 @@
+[project]
+name = "n8n-platform-errors"
+version = "0.0.0"
+description = "Shared error taxonomy for n8n Code nodes and Python backends"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["."]

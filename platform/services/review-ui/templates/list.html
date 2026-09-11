@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Pending reviews{% endblock %}
+{% block content %}
+<h1>Pending reviews</h1>
+
+{% if notice == "approved" %}
+<p class="notice">Decision saved: approved.</p>
+{% elif notice == "rejected" %}
+<p class="notice">Decision saved: rejected.</p>
+{% elif notice == "already_decided" %}
+<p class="notice">Already decided. No change.</p>
+{% endif %}
+
+{% if error %}
+<p class="error">Could not load the review queue: {{ error }}</p>
+{% elif not groups %}
+<p>No pending items.</p>
+{% else %}
+  {% for kind, items in groups %}
+  <h2>{{ kind }}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Created</th>
+        <th>Project</th>
+        <th>Subject</th>
+        <th>Id</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.created_at }}</td>
+        <td>{{ item.project }}</td>
+        <td>{{ item.subject_id }}</td>
+        <td><a href="/reviews/{{ item.id }}">{{ item.id }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+{% endif %}
+{% endblock %}

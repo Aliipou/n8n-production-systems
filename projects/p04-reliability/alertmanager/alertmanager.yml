@@ -1,0 +1,23 @@
+# Alertmanager config skeleton for P04.
+# TODO(verify): webhook payload shape against prom/alertmanager:v0.34.0
+# once [P04] Incident Handler exists (P04-T07). The webhook path below is a
+# placeholder, not a live workflow.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: n8n-incident
+  group_by:
+    - alertname
+    - fingerprint
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 30m
+
+receivers:
+  - name: n8n-incident
+    webhook_configs:
+      - url: http://n8n-main:5678/webhook/p04-incident
+        send_resolved: true
+        # TODO(verify): max_alerts and timeout fields on v0.34.0

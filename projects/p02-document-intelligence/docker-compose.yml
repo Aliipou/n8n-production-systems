@@ -1,0 +1,43 @@
+# p02-doc-service. Not runnable on its own. `make up P=p02-document-intelligence`
+# merges this file with platform/compose/docker-compose.base.yml once PLT-T03 exists.
+#
+# Host ports bind to 127.0.0.1 only. The process inside the container listens
+# on 0.0.0.0 so n8n on the compose network can reach it.
+
+services:
+  p02-doc-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: p02-doc-service:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8102:8000"
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}
+      P02_VAT_RATES: /app/config/vat_rates.yaml
+      P02_DECISION: /app/config/decision.yaml
+      P02_STORAGE_DIR: /data/documents
+      P02_INTAKE_WEBHOOK_URL: ${P02_INTAKE_WEBHOOK_URL:-http://n8n-main:5678/webhook/p02/documents}
+      TZ: ${TZ:-Europe/Helsinki}
+    volumes:
+      - p02_files:/data/documents
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  p02_files:

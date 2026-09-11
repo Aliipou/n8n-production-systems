@@ -1,0 +1,20 @@
+# Planned Prometheus alert rules for P04.
+# Thresholds below are spec defaults from docs/specs/04-reliability.md.
+# They are starting points to tune after real runs, not measured SLOs.
+#
+# Rules are empty until P04-T06 (promtool test rules). Do not add PromQL
+# that names metrics that have not been confirmed on the pinned n8n version.
+#
+# Planned alerts:
+#   WorkflowFailureRateHigh  failure rate over 5% for 15 min, at least 20 executions
+#   DLQGrowing               DLQ pending increases for 15 min
+#   InboxLagHigh             P03 oldest pending age over 5 min
+#   ReviewQueueStale         oldest pending review over 24 h
+#   WorkersMissing           fewer workers than expected for 5 min
+#   HeartbeatStale           no heartbeat event for 12 min (dead man's switch)
+#   CircuitOpen              any dependency circuit open for 10 min
+#   ExporterDown             exporter scrape failing for 5 min
+
+groups:
+  - name: p04.planned
+    rules: []

@@ -1,0 +1,35 @@
+# Auto-approve gates and money tolerances for doc-service.
+# Thresholds match docs/specs/02-document-intelligence.md section 6.
+
+version: 1
+
+tolerances:
+  # Euros. Used by vat_math and (later) line_totals.
+  money: "0.01"
+
+auto_approve:
+  min_confidence: 0.90
+  max_gross_eur: "5000"
+  allowed_currencies:
+    - EUR
+  require_all_validators_pass: true
+  require_supplier_known: true
+  require_iban_match: true
+  require_no_duplicate: true
+  require_critical_fields: true
+
+critical_fields:
+  - supplier_name
+  - supplier_business_id
+  - invoice_number
+  - invoice_date
+  - currency
+  - net_total
+  - vat_total
+  - gross_total
+  - iban
+
+rules:
+  iban_mismatch_always_review: true
+  unknown_supplier_always_review: true
+  foreign_currency_never_auto_approve: true

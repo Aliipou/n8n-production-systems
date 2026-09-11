@@ -1,0 +1,151 @@
+# Dependency and image scans. Weekly plus when lockfiles or Dockerfiles change.
+# Action refs are full version tags or commit SHAs. Never @latest.
+# continue-on-error is false. High and critical findings should fail the job.
+# pip-audit has no severity filter (fails on any finding). TODO(verify) high-only policy.
+# govulncheck fails on reachable vulns, not a CVSS high filter. TODO(verify) high-only policy.
+# Trivy uses HIGH,CRITICAL and exit-code 1.
+
+name: Security
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  push:
+    paths:
+      - "**/pyproject.toml"
+      - "**/uv.lock"
+      - "**/requirements*.txt"
+      - "**/go.mod"
+      - "**/go.sum"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/Dockerfile"
+      - "**/*.Dockerfile"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "**/pyproject.toml"
+      - "**/uv.lock"
+      - "**/requirements*.txt"
+      - "**/go.mod"
+      - "**/go.sum"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/Dockerfile"
+      - "**/*.Dockerfile"
+      - ".github/workflows/security.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PIP_AUDIT_VERSION: "2.10.1"
+  GOVULNCHECK_VERSION: "v1.1.4"
+  TRIVY_VERSION: "v0.70.0"
+
+jobs:
+  security:
+    name: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/uv.lock') != ''
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12.11"
+
+      - name: pip-audit
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/uv.lock') != ''
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "pip-audit==${PIP_AUDIT_VERSION}"
+          audited=0
+          while IFS= read -r -d '' f; do
+            audited=1
+            echo "pip-audit project $(dirname "$f")"
+            pip-audit --progress-spinner off --strict --project "$(dirname "$f")"
+          done < <(find . -name pyproject.toml -not -path './.git/*' -print0)
+          while IFS= read -r -d '' f; do
+            audited=1
+            echo "pip-audit requirements $f"
+            pip-audit --progress-spinner off --strict -r "$f"
+          done < <(find . -name 'requirements*.txt' -not -path './.git/*' -print0)
+          if [ "${audited}" -eq 0 ]; then
+            echo "No pyproject.toml or requirements files found after path filter"
+          fi
+
+      - name: Skip pip-audit
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/uv.lock') == ''
+        run: echo "No Python dependency files yet; skipping pip-audit"
+
+      - name: Locate go.mod
+        if: hashFiles('**/go.mod') != ''
+        id: gomod
+        run: |
+          set -euo pipefail
+          f=$(find . -name go.mod -not -path './.git/*' -print -quit)
+          echo "file=${f#./}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        if: steps.gomod.outputs.file != ''
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: ${{ steps.gomod.outputs.file }}
+
+      - name: govulncheck
+        if: steps.gomod.outputs.file != ''
+        run: |
+          set -euo pipefail
+          go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            echo "govulncheck in ${dir}"
+            (cd "${dir}" && govulncheck ./...)
+          done < <(find . -name go.mod -not -path './.git/*' -print0)
+
+      - name: Skip govulncheck
+        if: steps.gomod.outputs.file == ''
+        run: echo "No go.mod yet; skipping govulncheck"
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+          version: v0.70.0
+          format: table
+
+      - name: Trivy image scan of built Dockerfiles
+        if: hashFiles('**/Dockerfile', '**/*.Dockerfile') != ''
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' df; do
+            dir=$(dirname "$df")
+            file=$(basename "$df")
+            tag="ci-trivy-$(echo "${dir}/${file}" | tr '/:.' '---')"
+            echo "docker build ${dir} (${file}) as ${tag}"
+            docker build -f "$df" -t "$tag" "$dir"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              "aquasecurity/trivy:${TRIVY_VERSION#v}" \
+              image --severity HIGH,CRITICAL --exit-code 1 "$tag"
+          done < <(find . \( -name Dockerfile -o -name '*.Dockerfile' \) -not -path './.git/*' -print0)
+
+      - name: Skip Trivy image scan
+        if: hashFiles('**/Dockerfile', '**/*.Dockerfile') == ''
+        run: echo "No Dockerfiles yet; filesystem scan is the image gate until then"

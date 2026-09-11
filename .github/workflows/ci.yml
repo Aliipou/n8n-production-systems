@@ -1,0 +1,347 @@
+# CI quality gates from docs/PLAN.md section 9.
+# Action refs are full version tags or commit SHAs. Never @latest.
+# Job names lint, unit, secrets, e2e are the required checks in docs/branch-protection.md.
+# Paid provider APIs are not called. Mocks and .env.example placeholders only.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12.11"
+  NODE_VERSION: "22.23.2"
+  MYPY_VERSION: "2.3.1"
+  PYTEST_VERSION: "9.1.1"
+  PYTEST_COV_VERSION: "7.1.0"
+  GITLEAKS_VERSION: "8.30.0"
+  GITLEAKS_TARBALL_SHA256: "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: ruff
+        uses: astral-sh/ruff-action@v4.1.0
+        with:
+          version: "0.16.7"
+          args: "check ."
+
+      - name: ruff format
+        uses: astral-sh/ruff-action@v4.1.0
+        with:
+          version: "0.16.7"
+          args: "format --check ."
+
+      - name: Set up Python
+        if: hashFiles('**/src/**/*.py') != '' || hashFiles('scripts/lint_workflows.py') != ''
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12.11"
+
+      - name: mypy
+        if: hashFiles('**/src/**/*.py') != ''
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "mypy==${MYPY_VERSION}"
+          status=0
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            if ! grep -q '\[tool.mypy\]' "$f"; then
+              continue
+            fi
+            python -m pip install -e "${dir}[dev]" 2>/dev/null || python -m pip install -e "${dir}" || echo "skip editable ${dir}"
+            echo "mypy --strict in ${dir}"
+            (cd "${dir}" && mypy --strict) || status=1
+          done < <(find . -name pyproject.toml -not -path './.git/*' -print0)
+          exit "${status}"
+
+      - name: Locate go.mod
+        if: hashFiles('**/go.mod') != ''
+        id: gomod_lint
+        run: |
+          set -euo pipefail
+          f=$(find . -name go.mod -not -path './.git/*' -print -quit)
+          echo "file=${f#./}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        if: steps.gomod_lint.outputs.file != ''
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: ${{ steps.gomod_lint.outputs.file }}
+
+      - name: Install golangci-lint
+        if: steps.gomod_lint.outputs.file != ''
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.13.2
+          install-only: true
+
+      - name: golangci-lint
+        if: steps.gomod_lint.outputs.file != ''
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            echo "golangci-lint in ${dir}"
+            (cd "${dir}" && golangci-lint run ./...)
+          done < <(find . -name go.mod -not -path './.git/*' -print0)
+
+      - name: Set up Node
+        if: hashFiles('code-snippets/package.json') != ''
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22.23.2"
+          cache: npm
+          cache-dependency-path: code-snippets/package-lock.json
+
+      - name: vitest
+        if: hashFiles('code-snippets/package.json') != ''
+        working-directory: code-snippets
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "TODO(verify): commit package-lock.json so CI can use npm ci"
+            npm install
+          fi
+          npm test
+
+      - name: workflow linter
+        if: hashFiles('scripts/lint_workflows.py') != ''
+        run: |
+          set -euo pipefail
+          files=$(find platform/workflows projects -name '*.json' -type f 2>/dev/null || true)
+          if [ -z "${files}" ]; then
+            echo "No workflow JSON yet; skipping lint_workflows.py"
+            exit 0
+          fi
+          python scripts/lint_workflows.py
+
+  unit:
+    name: unit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        if: hashFiles('**/test_*.py', '**/*_test.py') != ''
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12.11"
+
+      - name: pytest
+        if: hashFiles('**/test_*.py', '**/*_test.py') != ''
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "pytest==${PYTEST_VERSION}" "pytest-cov==${PYTEST_COV_VERSION}"
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            python -m pip install -e "${dir}[dev]" 2>/dev/null || python -m pip install -e "${dir}" || echo "skip editable ${dir}"
+          done < <(find . -name pyproject.toml -not -path './.git/*' -print0)
+          extra=()
+          if find . -type d -name src -not -path './.git/*' | grep -q .; then
+            extra=(--cov --cov-report=term-missing --cov-fail-under=85)
+          fi
+          python -m pytest -q "${extra[@]}"
+
+      - name: Locate go.mod
+        if: hashFiles('**/go.mod') != ''
+        id: gomod_unit
+        run: |
+          set -euo pipefail
+          f=$(find . -name go.mod -not -path './.git/*' -print -quit)
+          echo "file=${f#./}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        if: steps.gomod_unit.outputs.file != ''
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: ${{ steps.gomod_unit.outputs.file }}
+
+      - name: go test -race
+        if: steps.gomod_unit.outputs.file != ''
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            echo "go test -race in ${dir}"
+            (cd "${dir}" && go test -race ./...)
+          done < <(find . -name go.mod -not -path './.git/*' -print0)
+
+      - name: No unit targets yet
+        if: hashFiles('**/test_*.py', '**/*_test.py') == '' && hashFiles('**/go.mod') == ''
+        run: echo "No pytest tests or go.mod yet; unit job is a no-op until backends exist"
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_TARBALL_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: gitleaks detect
+        run: gitleaks detect --source . --verbose --redact --exit-code 1
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # GitHub-hosted runners include Docker. This job starts compose services.
+    # This Windows workspace may not have Docker; the job is still defined for GitHub.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect platform e2e path changes
+        id: paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          run=false
+          if [ "${EVENT_NAME}" = "pull_request" ] && [ -n "${BASE_SHA:-}" ]; then
+            changed=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")
+          elif [ -n "${BEFORE_SHA:-}" ] && [ "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+            changed=$(git diff --name-only "${BEFORE_SHA}" "${HEAD_SHA}")
+          else
+            changed=$(git ls-files)
+          fi
+          printf '%s\n' "${changed}"
+          if printf '%s\n' "${changed}" | grep -Eq '^(platform/|scripts/|code-snippets/)'; then
+            run=true
+          fi
+          echo "run=${run}" >> "${GITHUB_OUTPUT}"
+
+      - name: Skip (paths outside platform e2e filter)
+        if: steps.paths.outputs.run != 'true'
+        run: echo "No changes under platform/, scripts/, or code-snippets/. Skipping compose."
+
+      - name: Prepare env from example only
+        if: steps.paths.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+      - name: docker compose up
+        if: steps.paths.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f platform/compose/docker-compose.base.yml ]; then
+            echo "platform/compose/docker-compose.base.yml is not in the tree yet (PLT-T03). Skipping stack."
+            exit 0
+          fi
+          docker compose --project-directory . \
+            -f platform/compose/docker-compose.base.yml \
+            --env-file .env \
+            up -d --wait
+
+      - name: Import and publish workflows
+        if: steps.paths.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f platform/compose/docker-compose.base.yml ]; then
+            echo "Compose not present; skip import"
+            exit 0
+          fi
+          if [ ! -f scripts/import_workflows.sh ]; then
+            echo "scripts/import_workflows.sh not present yet (PLT-T07). Skipping import."
+            exit 0
+          fi
+          json=$(find platform/workflows -name '*.json' -type f 2>/dev/null || true)
+          if [ -z "${json}" ]; then
+            echo "No platform workflow JSON yet (PLT-T09 to PLT-T11). Skipping import."
+            exit 0
+          fi
+          bash scripts/import_workflows.sh platform
+
+      - name: Set up Python for e2e tests
+        if: steps.paths.outputs.run == 'true'
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12.11"
+
+      - name: Run platform e2e tests
+        if: steps.paths.outputs.run == 'true'
+        env:
+          CI: "true"
+        run: |
+          set -euo pipefail
+          if [ ! -f platform/compose/docker-compose.base.yml ]; then
+            echo "Compose not present; skip e2e tests"
+            exit 0
+          fi
+          python -m pip install --upgrade pip
+          python -m pip install "pytest==${PYTEST_VERSION}"
+          if [ -d platform/tests/e2e ]; then
+            python -m pytest -q platform/tests/e2e
+          elif [ -d tests/e2e ]; then
+            python -m pytest -q tests/e2e
+          else
+            echo "Platform e2e tests not present yet (PLT-T13). Stack start is the gate until then."
+          fi
+
+      - name: Collect compose logs
+        if: failure() && steps.paths.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          if [ -f platform/compose/docker-compose.base.yml ]; then
+            docker compose --project-directory . \
+              -f platform/compose/docker-compose.base.yml \
+              --env-file .env \
+              logs > artifacts/compose-logs.txt || true
+            docker ps -a > artifacts/docker-ps.txt || true
+          fi
+
+      - name: Upload container logs
+        if: failure() && steps.paths.outputs.run == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: e2e-compose-logs
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

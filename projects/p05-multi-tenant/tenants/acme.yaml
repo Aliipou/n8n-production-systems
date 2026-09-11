@@ -1,0 +1,25 @@
+# Fictional tenant for local demos. Not a real company.
+slug: acme
+name: Acme Robotics Oy (fictional)
+languages: [fi, en]
+crm:
+  provider: mock          # mock | hubspot
+notifications:
+  channel: email          # email | slack
+  target: sales@acme.example
+scoring:
+  sales_threshold: 75
+  nurture_threshold: 45
+email:
+  from_name: Acme Sales
+  from_address: sales@acme.example
+  signature: "Acme Robotics Oy"
+followups:
+  enabled: true
+  steps_days: [3, 7]
+quotas:
+  leads_per_minute: 30
+  leads_per_day: 2000
+  llm_tokens_per_day: 200000
+secrets:                   # names only; values set with tenantctl secret set
+  - crm_token

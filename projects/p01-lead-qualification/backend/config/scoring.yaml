@@ -1,0 +1,18 @@
+version: 1
+max_score: 100
+components:
+  company_size:     {max: 25, bands: {"1-10": 5, "11-50": 15, "51-200": 25, "201-1000": 20, "1000+": 10, unknown: 5}}
+  industry_fit:     {max: 20, fit: [software, saas, manufacturing, logistics], partial: [retail, public_sector], fit_points: 20, partial_points: 10, other_points: 0}
+  budget:           {max: 20, form_field: budget_range, bands: {"<5k": 0, "5k-20k": 10, "20k-50k": 16, "50k+": 20, unknown: 5}}
+  urgency:          {max: 15, form_field: timeline, bands: {now: 15, "1-3 months": 10, "3-6 months": 5, exploring: 2, unknown: 3}, llm_fallback_field: urgency_hint}
+  ai_qualification: {max: 20, intent_points: {demo_request: 20, pricing: 16, partnership: 8, other: 4, support: 0, job_application: 0, spam: 0}}
+routes:
+  - {name: sales, min: 80}
+  - {name: nurture, min: 50}
+  - {name: archive, min: 0}
+overrides:
+  - {when: {intent: spam}, route: archive}
+  - {when: {intent: job_application}, route: hr_forward}
+  - {when: {intent: support}, route: support_forward}
+  - {when: {is_free_mail: true}, cap_score: 60}
+  - {when: {llm_status: failed}, cap_route: nurture}

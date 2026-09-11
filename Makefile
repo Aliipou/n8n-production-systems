@@ -3,11 +3,19 @@
 P ?=
 SCENARIO ?=
 
+COMPOSE_FILE := platform/compose/docker-compose.base.yml
+COMPOSE := docker compose --project-directory . -f $(COMPOSE_FILE)
+
+ifneq ($(P),)
+COMPOSE += -f projects/$(P)/docker-compose.yml
+endif
+
 help:
 	@echo "n8n-production-systems"
-	@echo "  make up P=<project>       Start platform plus one project (PLT-T03)"
-	@echo "  make down                 Stop the stack (PLT-T03)"
-	@echo "  make reset                Destroy local volumes after confirm (PLT-T03)"
+	@echo "  make up P=<project>       Start platform plus one project"
+	@echo "  make up                   Start platform only"
+	@echo "  make down                 Stop the stack"
+	@echo "  make reset                Destroy local volumes after confirm"
 	@echo "  make import P=<project>   Import and publish workflows (PLT-T07)"
 	@echo "  make export P=<project>   Export, sanitize, lint (PLT-T07)"
 	@echo "  make sync-snippets        Copy code-snippets into Code nodes (PLT-T07)"
@@ -19,22 +27,45 @@ help:
 	@echo "  make chaos SCENARIO=<n>   Chaos scenario (P04)"
 
 up:
-	$(error not implemented until PLT-T03)
+	@test -f .env || (echo "Copy .env.example to .env and set secrets first." && exit 1)
+ifneq ($(P),)
+	@test -f projects/$(P)/docker-compose.yml || (echo "missing projects/$(P)/docker-compose.yml" && exit 1)
+endif
+	$(COMPOSE) --env-file .env up -d --build --wait --wait-timeout 180
+	@echo "n8n        http://127.0.0.1:5678"
+	@echo "Mailpit    http://127.0.0.1:8025"
+	@echo "mock-llm   http://127.0.0.1:8090"
+	@echo "flaky-api  http://127.0.0.1:8091"
+	@echo "review-ui  http://127.0.0.1:8092"
 
 down:
-	$(error not implemented until PLT-T03)
+	@test -f .env || (echo "Copy .env.example to .env and set secrets first." && exit 1)
+	$(COMPOSE) --env-file .env down
 
 reset:
-	$(error not implemented until PLT-T03)
+	@test -f .env || (echo "Copy .env.example to .env and set secrets first." && exit 1)
+	@echo "This deletes compose volumes (postgres, redis, n8n, mailpit data)."
+	@echo "Type yes to continue"
+	@read confirm; \
+	if [ "$$confirm" != "yes" ]; then echo "aborted"; exit 1; fi
+	$(COMPOSE) --env-file .env down -v
 
 import:
-	$(error not implemented until PLT-T07)
+	@if [ ! -f scripts/import_workflows.sh ]; then \
+		echo "error: not implemented until PLT-T07 (scripts/import_workflows.sh missing)" >&2; \
+		exit 1; \
+	fi
+	P=$(P) ./scripts/import_workflows.sh
 
 export:
-	$(error not implemented until PLT-T07)
+	@if [ ! -f scripts/export_workflows.sh ]; then \
+		echo "error: not implemented until PLT-T07 (scripts/export_workflows.sh missing)" >&2; \
+		exit 1; \
+	fi
+	P=$(P) ./scripts/export_workflows.sh
 
 sync-snippets:
-	$(error not implemented until PLT-T07)
+	python scripts/sync_snippets.py
 
 test:
 	$(error not implemented until backend and snippet tests exist)

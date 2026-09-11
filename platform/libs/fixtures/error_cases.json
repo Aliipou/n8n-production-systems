@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "notes": {
+    "classes": "transient, rate_limited, invalid_data, auth, permanent, unknown. HTTP 409 on an idempotent create is not an error: class is success and idempotent_success is true.",
+    "backoff": "full jitter: delay_s = jitter_fn() * min(cap, base * 2^attempt). attempt is 0-based (0 is the delay after the first failure). Defaults: base 2 s, cap 300 s, max 6 attempts. jitter_fn returns a number in [0, 1)."
+  },
+  "backoff": {
+    "algorithm": "full_jitter",
+    "base_s": 2,
+    "cap_s": 300,
+    "max_attempts": 6
+  },
+  "delay_ceilings": [
+    { "attempt": 0, "ceiling": 2 },
+    { "attempt": 1, "ceiling": 4 },
+    { "attempt": 2, "ceiling": 8 },
+    { "attempt": 3, "ceiling": 16 },
+    { "attempt": 4, "ceiling": 32 },
+    { "attempt": 5, "ceiling": 64 },
+    { "attempt": 6, "ceiling": 128 },
+    { "attempt": 7, "ceiling": 256 },
+    { "attempt": 8, "ceiling": 300 },
+    { "attempt": 9, "ceiling": 300 }
+  ],
+  "cases": [
+    {
+      "id": "http_500",
+      "input": { "status": 500, "message": "Internal Server Error" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "http_502",
+      "input": { "status": 502, "message": "Bad Gateway" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "http_503",
+      "input": { "status": 503, "message": "Service Unavailable" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "http_504",
+      "input": { "status": 504, "message": "Gateway Timeout" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "status_string_503",
+      "input": { "status": "503" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "n8n_nested_httpCode_502",
+      "input": { "error": { "httpCode": "502", "message": "Bad gateway from HTTP Request" } },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "timeout_etimedout",
+      "input": { "code": "ETIMEDOUT", "message": "connect ETIMEDOUT" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "timeout_message",
+      "input": { "message": "Request timed out after 30000ms" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "timeout_deadline",
+      "input": { "message": "deadline exceeded" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "conn_reset",
+      "input": { "code": "ECONNRESET", "message": "read ECONNRESET" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "conn_refused",
+      "input": { "code": "ECONNREFUSED", "message": "connect ECONNREFUSED 127.0.0.1:8091" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "socket_hang_up",
+      "input": { "message": "socket hang up" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "dns_eai_again",
+      "input": { "code": "EAI_AGAIN", "message": "getaddrinfo EAI_AGAIN mock.example" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "dns_enotfound",
+      "input": { "code": "ENOTFOUND", "message": "getaddrinfo ENOTFOUND mock.example" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "dns_temporary_message",
+      "input": { "message": "temporary failure in name resolution" },
+      "expected": { "class": "transient", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "http_429",
+      "input": { "status": 429, "message": "Too Many Requests", "retry_after": 20 },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "rate_limit_code",
+      "input": { "code": "RATE_LIMIT_EXCEEDED", "message": "Rate limit exceeded" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "provider_ratelimited",
+      "input": { "code": "ratelimited" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "throttling_code",
+      "input": { "code": "THROTTLING" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "too_many_requests_message",
+      "input": { "message": "Too Many Requests, slow down" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "resource_exhausted",
+      "input": { "code": "RESOURCE_EXHAUSTED" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "axios_status_in_message_429",
+      "input": { "message": "Request failed with status code 429" },
+      "expected": { "class": "rate_limited", "retry": true, "idempotent_success": false }
+    },
+    {
+      "id": "http_400",
+      "input": { "status": 400, "message": "Bad Request" },
+      "expected": { "class": "invalid_data", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_422",
+      "input": { "status": 422, "message": "Unprocessable Entity" },
+      "expected": { "class": "invalid_data", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "schema_validation_message",
+      "input": { "message": "schema validation failed: required property email" },
+      "expected": { "class": "invalid_data", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "validation_error_code",
+      "input": { "code": "VALIDATION_ERROR", "message": "payload failed validation" },
+      "expected": { "class": "invalid_data", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "status_400_beats_timeout_message",
+      "input": { "status": 400, "message": "timeout field is required" },
+      "expected": { "class": "invalid_data", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_401",
+      "input": { "status": 401, "message": "Unauthorized" },
+      "expected": { "class": "auth", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_403",
+      "input": { "status": 403, "message": "Forbidden" },
+      "expected": { "class": "auth", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "n8n_nested_401",
+      "input": { "error": { "httpCode": "401", "message": "Authorization failed" } },
+      "expected": { "class": "auth", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_404",
+      "input": { "status": 404, "message": "Not Found" },
+      "expected": { "class": "permanent", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_410",
+      "input": { "status": 410, "message": "Gone" },
+      "expected": { "class": "permanent", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_501",
+      "input": { "status": 501, "message": "Not Implemented" },
+      "expected": { "class": "permanent", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_409_non_idempotent",
+      "input": { "status": 409, "message": "Conflict", "idempotent_create": false },
+      "expected": { "class": "permanent", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_409_missing_flag",
+      "input": { "status": 409, "message": "Conflict" },
+      "expected": { "class": "permanent", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_409_idempotent_create",
+      "input": { "status": 409, "message": "already exists", "idempotent_create": true },
+      "expected": { "class": "success", "retry": false, "idempotent_success": true }
+    },
+    {
+      "id": "http_418",
+      "input": { "status": 418, "message": "I'm a teapot" },
+      "expected": { "class": "unknown", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "empty_object",
+      "input": {},
+      "expected": { "class": "unknown", "retry": false, "idempotent_success": false }
+    },
+    {
+      "id": "http_200_not_an_error",
+      "input": { "status": 200, "message": "ok" },
+      "expected": { "class": "unknown", "retry": false, "idempotent_success": false }
+    }
+  ]
+}

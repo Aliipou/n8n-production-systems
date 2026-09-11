@@ -24,6 +24,7 @@ build/
 
 # Node (Code node snippet tests)
 node_modules/
+**/_scratch/
 coverage/
 
 # Go

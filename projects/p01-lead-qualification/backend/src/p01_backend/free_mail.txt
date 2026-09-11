@@ -1,0 +1,7 @@
+# Invented free-mail domains for local tests and demos.
+# Source: written for this repository. Not copied from a public catalog.
+# Replace with a maintained list before any real deployment.
+freebox.test
+post-gratis.test
+mail-hop.test
+inbox-open.test

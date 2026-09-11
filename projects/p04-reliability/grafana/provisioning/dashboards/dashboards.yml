@@ -1,0 +1,15 @@
+# File provider only. Dashboard JSON is not committed until it is exported
+# from a real demo run (P04-T05). Do not add generated fake metric panels.
+apiVersion: 1
+
+providers:
+  - name: p04
+    orgId: 1
+    folder: P04
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
