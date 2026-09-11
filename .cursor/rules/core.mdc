@@ -1,0 +1,10 @@
+---
+description: Core rules for the n8n-production-systems monorepo
+alwaysApply: true
+---
+
+Before any change, read and follow AGENTS.md at the repository root. It is binding.
+The master plan is docs/PLAN.md and the specs are in docs/specs/.
+Work on one task ID at a time, log progress in docs/PROGRESS.md, and put open questions in docs/QUESTIONS.md instead of guessing.
+Never commit secrets, real personal data, pinData, or numbers that were not produced by a script in this repo.
+Never write n8n workflow JSON to the repo unless it was imported into the pinned local n8n and passed its e2e tests (AGENTS.md section 5).

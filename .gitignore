@@ -1,0 +1,71 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+n8n-api-key.txt
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node (Code node snippet tests)
+node_modules/
+coverage/
+
+# Go
+bin/
+vendor/
+*.exe
+*.test
+*.out
+
+# uv / packaging
+uv.lock.bak
+
+# Docker and local volumes
+.docker-data/
+postgres-data/
+redis-data/
+n8n-data/
+mailpit-data/
+
+# n8n exports that must never be committed raw
+**/pinData.json
+**/*execution*.json
+
+# OS and editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# Windows leftovers and source archives (not part of the repo)
+*.zip
+New Text Document.txt
+/PLAN.md
+
+# Large generated datasets (scripts recreate them)
+**/fixtures/generated/
+**/eval/full-set/
+*.pdf
+!docs/**/*.pdf
+
+# Logs
+*.log
+logs/

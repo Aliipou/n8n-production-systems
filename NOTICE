@@ -1,0 +1,18 @@
+n8n Production Systems
+======================
+
+Code in this repository is licensed under the MIT License (see LICENSE).
+
+n8n is a product of n8n GmbH and is licensed separately (Sustainable Use
+License at the time this NOTICE was written). This repository does not
+include, vendor, or redistribute n8n. Obtain n8n yourself and read the
+current licence text published by n8n GmbH:
+
+https://docs.n8n.io/sustainable-use-license/
+
+TODO(verify): confirm the licence URL still matches the current n8n docs
+when pinning the n8n version in PLT-T02.
+
+Project P05 is a reference architecture for learning and demonstration.
+It is not a hosted product and is not an offer to run n8n as a service
+for paying clients.
