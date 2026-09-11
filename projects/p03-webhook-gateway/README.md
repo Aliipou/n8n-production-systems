@@ -62,7 +62,7 @@ Canvas screenshot: not taken yet (workflows not imported).
 
 ## Run it in 5 minutes
 
-Platform compose (`make up P=p03`) is not runnable until `platform/compose/docker-compose.base.yml` exists. After that:
+Platform compose is in `platform/compose/docker-compose.base.yml`. After Docker is installed:
 
 ```bash
 git clone https://github.com/Aliipou/n8n-production-systems

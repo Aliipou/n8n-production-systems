@@ -1,5 +1,5 @@
-# p02-doc-service. Not runnable on its own. `make up P=p02-document-intelligence`
-# merges this file with platform/compose/docker-compose.base.yml once PLT-T03 exists.
+# p02-doc-service. Not runnable on its own. `make up P=p02`
+# merges this file with platform/compose/docker-compose.base.yml.
 #
 # Host ports bind to 127.0.0.1 only. The process inside the container listens
 # on 0.0.0.0 so n8n on the compose network can reach it.

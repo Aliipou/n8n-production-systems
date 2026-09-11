@@ -1,0 +1,20 @@
+# Overlay for `make up P=p05`. Merges with platform/compose/docker-compose.base.yml.
+# Applies schema p05 migrations. Gateway, backend, and proxy are not in this slice.
+# Host ports: none. n8n and review-ui stay on the platform file.
+
+services:
+  p05-migrate:
+    image: amacneil/dbmate:2.35.1
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-n8n}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB_APP:-app}?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /migrations
+      DBMATE_NO_DUMP_SCHEMA: "true"
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command: ["--wait", "--no-dump-schema", "--migrations-dir", "/migrations", "up"]

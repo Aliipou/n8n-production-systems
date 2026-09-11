@@ -4,7 +4,7 @@ Personal portfolio project (reference implementation, synthetic data only). Not 
 
 n8n orchestrates intake, processing, review callbacks, export, and scheduled jobs. This FastAPI doc-service stores files, dedupes by sha256, and runs deterministic validators. Files never pass through n8n; n8n carries `document_id` only.
 
-Status: not runnable until the platform compose stack exists (`platform/compose/docker-compose.base.yml`, PLT-T03) and `make up P=p02-document-intelligence` can start it. OCR, LLM extraction, and evaluation are later tasks.
+Status: in progress. Platform compose exists. `make up P=p02` needs Docker. OCR, LLM extraction, and evaluation are later tasks. Version: not tagged.
 
 Results: not measured yet.
 
@@ -64,7 +64,7 @@ make up P=p02-document-intelligence
 make demo P=p02-document-intelligence
 ```
 
-`make up` and `make demo` are not available until the platform compose stack and the P02 demo script exist. One-time n8n owner setup is in `platform/README.md`. Bind addresses stay on `127.0.0.1`. After the stack exists, doc-service is `http://127.0.0.1:8102`.
+`make demo P=p02` is not implemented. One-time n8n owner setup is in `platform/README.md`. Bind addresses stay on `127.0.0.1`. After `make up P=p02`, doc-service is `http://127.0.0.1:8102`. Docker was not run on the Windows workspace that last updated this file.
 
 ## Synthetic data
 

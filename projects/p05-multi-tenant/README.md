@@ -104,9 +104,8 @@ cp .env.example .env
 make up P=p05-multi-tenant
 ```
 
-`make up P=p05-multi-tenant` needs `projects/p05-multi-tenant/docker-compose.yml`,
-which is not in this draft. Platform compose plus P05 migrations are not
-wired yet. `make demo` is not implemented.
+`make up P=p05` applies P05 migrations on top of the platform stack. Gateway,
+backend, and proxy are not in this overlay. `make demo` is not implemented.
 
 Example tenant file (fictional): [tenants/acme.yaml](tenants/acme.yaml).
 Schema: [config/tenant.schema.json](config/tenant.schema.json).
